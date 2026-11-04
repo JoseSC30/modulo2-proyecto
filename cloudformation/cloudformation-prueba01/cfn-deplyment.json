@@ -1,5 +1,5 @@
 {
-  "template-file-path": "template.yaml",
+  "template-file-path": "cloudformation/cloudformation-prueba01/template.yaml",
   "parameters": {
     "InstanceType": "t3.nano"
   },
