@@ -3,8 +3,8 @@ Description: Control de Asistencia - backend PostgreSQL y frontend con cloud-ini
 
 Parameters:
   LatestAmiId:
-    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
-    Default: /aws/service/canonical/ubuntu/24.04/stable/current/amd64/hvm-ssd-gp3/ami-id
+    Type: AWS::EC2::Image::Id
+    Default: ami-09519cc56eb20524
   InstanceType:
     Type: String
     Default: t2.micro
