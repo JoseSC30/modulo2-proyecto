@@ -27,7 +27,16 @@ Desde AWS CloudFormation, crea un stack usando `template.yaml` y proporciona:
 
 Si utilizas Git Sync, reemplaza los valores `REPLACE_WITH_*` de
 `cfn-deplyment.json` antes de sincronizar. Son placeholders intencionales y no
-deben llegar a producción.
+deben llegar a producción. El nombre actual del archivo contiene `deplyment`
+por compatibilidad con la configuración existente de Git Sync; si cambias su
+nombre, también debes actualizar la ruta del deployment file en CloudFormation.
+
+Debes publicar ambos archivos en la rama configurada por Git Sync:
+
+```text
+cloudformation/cloudformation-prueba01/cfn-deplyment.json
+cloudformation/cloudformation-prueba01/template.yaml
+```
 
 También puedes usar AWS CLI:
 

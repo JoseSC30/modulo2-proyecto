@@ -3,7 +3,8 @@
   "parameters": {
     "InstanceType": "t3.nano",
     "DatabasePassword": "REPLACE_WITH_A_SECURE_DB_PASSWORD",
-    "JwtSecret": "REPLACE_WITH_A_SECURE_JWT_SECRET_VALUE"
+    "JwtSecret": "REPLACE_WITH_A_SECURE_JWT_SECRET_VALUE",
+    "VpcCidr": "172.31.0.0/16"
   },
   "tags": {
     "Proyecto": "Practica-CloudFormation",
