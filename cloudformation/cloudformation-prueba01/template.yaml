@@ -1,0 +1,321 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Control de Asistencia - backend PostgreSQL y frontend con cloud-init
+
+Parameters:
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/24.04/stable/current/amd64/hvm-ssd-gp3/ami-id
+  InstanceType:
+    Type: String
+    Default: t2.micro
+  AvailabilityZone:
+    Type: AWS::EC2::AvailabilityZone::Name
+    Default: us-east-2a
+  BackendRepository:
+    Type: String
+    Default: https://github.com/JoseSC30/backend-control-asistencia.git
+  FrontendRepository:
+    Type: String
+    Default: https://github.com/JoseSC30/frontend-control-asistencia.git
+  RepositoryBranch:
+    Type: String
+    Default: main
+  ApplicationUser:
+    Type: String
+    Default: app
+  DatabaseName:
+    Type: String
+    Default: appdb
+  DatabaseUser:
+    Type: String
+    Default: appuser
+  DatabasePassword:
+    Type: String
+    NoEcho: true
+    MinLength: 16
+  JwtSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+
+Resources:
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref InstanceRole
+
+  BackendSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: cfn-control-asistencia backend y PostgreSQL
+      Tags:
+        - Key: Name
+          Value: cfn-control-asistencia-backend-db-sg
+        - Key: Project
+          Value: cfn-control-asistencia
+
+  FrontendSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: cfn-control-asistencia frontend
+      Tags:
+        - Key: Name
+          Value: cfn-control-asistencia-frontend-sg
+        - Key: Project
+          Value: cfn-control-asistencia
+
+  BackendSshIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt BackendSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: 0.0.0.0/0
+      Description: EC2 Instance Connect
+
+  BackendHttpIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt BackendSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: 0.0.0.0/0
+
+  BackendApiIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt BackendSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 3000
+      ToPort: 3000
+      SourceSecurityGroupId: !GetAtt FrontendSecurityGroup.GroupId
+
+  BackendPostgresIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt BackendSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      SourceSecurityGroupId: !GetAtt FrontendSecurityGroup.GroupId
+
+  FrontendSshIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt FrontendSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: 0.0.0.0/0
+      Description: EC2 Instance Connect
+
+  FrontendHttpIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt FrontendSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: 0.0.0.0/0
+
+  BackendInstance:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - BackendSshIngress
+      - BackendHttpIngress
+      - BackendApiIngress
+      - BackendPostgresIngress
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      AvailabilityZone: !Ref AvailabilityZone
+      SecurityGroupIds:
+        - !Ref BackendSecurityGroup
+      IamInstanceProfile: !Ref InstanceProfile
+      UserData:
+        Fn::Base64:
+          Fn::Sub: |
+            #cloud-config
+            package_update: true
+            packages:
+              - git
+              - postgresql
+              - postgresql-contrib
+              - nginx
+              - curl
+            write_files:
+              - path: /etc/control-asistencia-backend.env
+                owner: root:root
+                permissions: "0600"
+                content: |
+                  NODE_ENV=production
+                  PORT=3000
+                  DATABASE_URL=postgresql://${DatabaseUser}:${DatabasePassword}@127.0.0.1:5432/${DatabaseName}
+                  JWT_SECRET=${JwtSecret}
+                  CLIENT_URL="*"
+              - path: /etc/nginx/sites-available/control-asistencia-backend
+                owner: root:root
+                permissions: "0644"
+                content: |
+                  server {
+                    listen 80 default_server;
+                    listen [::]:80 default_server;
+                    server_name _;
+                    location = / {
+                      default_type application/json;
+                      return 200 '{"status":"ok","service":"control-asistencia-backend"}';
+                    }
+                    location /api/ {
+                      proxy_pass http://127.0.0.1:3000/api/;
+                      proxy_http_version 1.1;
+                      proxy_set_header Host $host;
+                      proxy_set_header X-Real-IP $remote_addr;
+                      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    }
+                  }
+              - path: /etc/systemd/system/control-asistencia-backend.service
+                owner: root:root
+                permissions: "0644"
+                content: |
+                  [Unit]
+                  Description=Control de Asistencia Backend
+                  After=network-online.target postgresql.service
+                  Wants=network-online.target
+                  Requires=postgresql.service
+                  [Service]
+                  Type=simple
+                  User=${ApplicationUser}
+                  WorkingDirectory=/opt/backend
+                  EnvironmentFile=/etc/control-asistencia-backend.env
+                  ExecStart=/usr/bin/node /opt/backend/src/server.js
+                  Restart=on-failure
+                  RestartSec=5
+                  [Install]
+                  WantedBy=multi-user.target
+            runcmd:
+              - [ bash, -c, "id -u ${ApplicationUser} >/dev/null 2>&1 || useradd --create-home --shell /bin/bash ${ApplicationUser}" ]
+              - [ bash, -c, "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -" ]
+              - [ apt-get, install, -y, nodejs ]
+              - [ systemctl, enable, --now, postgresql ]
+              - [ bash, -c, "PG_CONF=$(find /etc/postgresql -name postgresql.conf -print -quit); PG_HBA=$(find /etc/postgresql -name pg_hba.conf -print -quit); sed -i \"s/^#listen_addresses = 'localhost'/listen_addresses = '*'/\" \"$PG_CONF\"; printf '\\nhost ${DatabaseName} ${DatabaseUser} 0.0.0.0/0 scram-sha-256\\n' >> \"$PG_HBA\"; systemctl restart postgresql" ]
+              - [ bash, -c, "if ! sudo -u postgres psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='${DatabaseUser}'\" | grep -q 1; then sudo -u postgres psql -v ON_ERROR_STOP=1 -c \"CREATE USER ${DatabaseUser} WITH PASSWORD '${DatabasePassword}';\"; fi" ]
+              - [ bash, -c, "if ! sudo -u postgres psql -tAc \"SELECT 1 FROM pg_database WHERE datname='${DatabaseName}'\" | grep -q 1; then sudo -u postgres psql -v ON_ERROR_STOP=1 -c \"CREATE DATABASE ${DatabaseName} OWNER ${DatabaseUser};\"; fi" ]
+              - [ bash, -c, "git clone --branch ${RepositoryBranch} ${BackendRepository} /opt/backend" ]
+              - [ bash, -c, "chown -R ${ApplicationUser}:${ApplicationUser} /opt/backend; cd /opt/backend; npm ci --omit=dev" ]
+              - [ bash, -c, "sed '/^CREATE DATABASE /d;/^\\\\connect /d' /opt/backend/schema.sql > /tmp/control-asistencia-schema.sql; sudo -u postgres psql -v ON_ERROR_STOP=1 -d ${DatabaseName} -f /tmp/control-asistencia-schema.sql" ]
+              - [ bash, -c, "sudo -u postgres psql -v ON_ERROR_STOP=1 -d ${DatabaseName} -c \"GRANT USAGE ON SCHEMA public TO ${DatabaseUser}; GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${DatabaseUser}; GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ${DatabaseUser}; GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO ${DatabaseUser};\"" ]
+              - [ systemctl, daemon-reload ]
+              - [ systemctl, enable, --now, control-asistencia-backend ]
+              - [ bash, -c, "rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/control-asistencia-backend; ln -s /etc/nginx/sites-available/control-asistencia-backend /etc/nginx/sites-enabled/control-asistencia-backend; nginx -t" ]
+              - [ systemctl, restart, nginx ]
+              - [ systemctl, enable, nginx ]
+      Tags:
+        - Key: Name
+          Value: cfn-control-asistencia-backend-db
+        - Key: Project
+          Value: cfn-control-asistencia
+        - Key: Role
+          Value: backend-db
+
+  FrontendInstance:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - FrontendSshIngress
+      - FrontendHttpIngress
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      AvailabilityZone: !Ref AvailabilityZone
+      SecurityGroupIds:
+        - !Ref FrontendSecurityGroup
+      IamInstanceProfile: !Ref InstanceProfile
+      UserData:
+        Fn::Base64:
+          Fn::Sub:
+            - |
+              #cloud-config
+              package_update: true
+              packages:
+                - git
+                - nginx
+                - curl
+              write_files:
+                - path: /etc/nginx/sites-available/control-asistencia
+                  owner: root:root
+                  permissions: "0644"
+                  content: |
+                    server {
+                      listen 80 default_server;
+                      listen [::]:80 default_server;
+                      server_name _;
+                      root /var/www/control-asistencia;
+                      index index.html;
+                      location / {
+                        try_files $uri $uri/ /index.html;
+                      }
+                      location /api/ {
+                        proxy_pass http://${BackendPrivateIp}:3000/api/;
+                        proxy_http_version 1.1;
+                        proxy_set_header Host $host;
+                        proxy_set_header X-Real-IP $remote_addr;
+                        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                      }
+                      location = /api {
+                        proxy_pass http://${BackendPrivateIp}:3000/api;
+                        proxy_http_version 1.1;
+                        proxy_set_header Host $host;
+                        proxy_set_header X-Real-IP $remote_addr;
+                        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                      }
+                    }
+              runcmd:
+                - [ bash, -c, "id -u ${ApplicationUser} >/dev/null 2>&1 || useradd --create-home --shell /bin/bash ${ApplicationUser}" ]
+                - [ bash, -c, "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -" ]
+                - [ apt-get, install, -y, nodejs ]
+                - [ bash, -c, "git clone --branch ${RepositoryBranch} ${FrontendRepository} /opt/frontend" ]
+                - [ bash, -c, "chown -R ${ApplicationUser}:${ApplicationUser} /opt/frontend; cd /opt/frontend; npm ci; VITE_API_URL=/api npm run build" ]
+                - [ bash, -c, "rm -rf /var/www/control-asistencia; install -d -o www-data -g www-data /var/www/control-asistencia; cp -a /opt/frontend/dist/. /var/www/control-asistencia/; chown -R www-data:www-data /var/www/control-asistencia" ]
+                - [ bash, -c, "rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/control-asistencia; ln -s /etc/nginx/sites-available/control-asistencia /etc/nginx/sites-enabled/control-asistencia; nginx -t" ]
+                - [ systemctl, restart, nginx ]
+                - [ systemctl, enable, nginx ]
+            - BackendPrivateIp: !GetAtt BackendInstance.PrivateIp
+              ApplicationUser: !Ref ApplicationUser
+              RepositoryBranch: !Ref RepositoryBranch
+              FrontendRepository: !Ref FrontendRepository
+      Tags:
+        - Key: Name
+          Value: cfn-control-asistencia-frontend
+        - Key: Project
+          Value: cfn-control-asistencia
+        - Key: Role
+          Value: frontend
+
+Outputs:
+  BackendPublicIp:
+    Description: IP publica del backend
+    Value: !GetAtt BackendInstance.PublicIp
+  FrontendPublicIp:
+    Description: IP publica del frontend
+    Value: !GetAtt FrontendInstance.PublicIp
+  FrontendUrl:
+    Description: URL publica del frontend
+    Value: !Sub http://${FrontendInstance.PublicIp}
+  BackendUrl:
+    Description: URL de comprobacion del backend
+    Value: !Sub http://${BackendInstance.PublicIp}

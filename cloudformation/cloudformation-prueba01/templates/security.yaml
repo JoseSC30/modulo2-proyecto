@@ -1,0 +1,18 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Modulo de Red - Security Group base
+
+Resources:
+  MiSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group para practica de CloudFormation con Git Sync
+      Tags:
+        - Key: Name
+          Value: cfn-practica-sg
+        - Key: Environment
+          Value: Practica-Clases
+
+Outputs:
+  SecurityGroupId:
+    Description: ID del Security Group creado
+    Value: !Ref MiSecurityGroup

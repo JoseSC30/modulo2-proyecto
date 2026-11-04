@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Stack Padre orquestador de componentes anidados
+
+Parameters:
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+  InstanceType:
+    Type: String
+    Default: t3.nano
+
+Resources:
+  # 1. Llamada al modulo IAM
+  StackIAM:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: iam.yaml
+
+  # 2. Llamada al modulo de Seguridad
+  StackSeguridad:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: seguridad.yaml
+
+  # 3. Llamada al modulo de Servidores (inyecta los Outputs de IAM y Seguridad)
+  StackServidores:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: servidores.yaml
+      Parameters:
+        LatestAmiId: !Ref LatestAmiId
+        InstanceType: !Ref InstanceType
+        SecurityGroupId: !GetAtt StackSeguridad.Outputs.SecurityGroupId
+        IamInstanceProfile: !GetAtt StackIAM.Outputs.PerfilInstanciaSSM
+
+Outputs:
+  Servidor1Id:
+    Description: ID del servidor principal extraido del modulo de computo
+    Value: !GetAtt StackServidores.Outputs.Servidor1Id

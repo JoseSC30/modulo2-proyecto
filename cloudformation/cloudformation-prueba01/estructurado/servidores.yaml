@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Modulo de Computo - Instancias EC2
+
+Parameters:
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+  InstanceType:
+    Type: String
+    Default: t3.nano
+  SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: ID del Security Group recibido desde el modulo de seguridad
+  IamInstanceProfile:
+    Type: String
+    Description: Nombre del perfil IAM recibido desde el modulo de IAM
+
+Resources:
+  # Instancia 1
+  InstanciaPersona1:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      SecurityGroupIds:
+        - !Ref SecurityGroupId
+      IamInstanceProfile: !Ref IamInstanceProfile
+      Tags:
+        - Key: Name
+          Value: cfn-servidor-persona-1
+
+  # Instancia 2
+  # InstanciaPersona2:
+  #   Type: AWS::EC2::Instance
+  #   Properties:
+  #     ImageId: !Ref LatestAmiId
+  #     InstanceType: !Ref InstanceType
+  #     SecurityGroupIds:
+  #       - !Ref SecurityGroupId
+  #     IamInstanceProfile: !Ref IamInstanceProfile
+  #     Tags:
+  #       - Key: Name
+  #         Value: cfn-servidor-persona-2
+
+Outputs:
+  Servidor1Id:
+    Description: ID de la primera instancia EC2
+    Value: !Ref InstanciaPersona1
+  # Servidor2Id:
+  #   Description: ID de la segunda instancia EC2
+  #   Value: !Ref InstanciaPersona2

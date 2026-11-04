@@ -1,0 +1,27 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Modulo de IAM - Rol y Perfil de instancia para Session Manager
+
+Resources:
+  RolConexionSSM:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  PerfilInstanciaSSM:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref RolConexionSSM
+
+Outputs:
+  PerfilInstanciaSSM:
+    Description: Nombre del perfil de instancia IAM para EC2
+    Value: !Ref PerfilInstanciaSSM

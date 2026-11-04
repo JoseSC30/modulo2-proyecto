@@ -1,0 +1,50 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Modulo de Computo - Instancias EC2 para trabajo colaborativo
+
+Parameters:
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+  SecurityGroupId:
+    Type: String
+  IamInstanceProfile:
+    Type: String
+
+Resources:
+  # Instancia agregada por la Persona 1
+  InstanciaCfnA:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: t3.nano
+      SecurityGroupIds:
+        - !Ref SecurityGroupId
+      IamInstanceProfile: !Ref IamInstanceProfile
+      Tags:
+        - Key: Name
+          Value: cfn-practica-persona-1
+        - Key: Owner
+          Value: IntegranteA
+
+  # Instancia agregada por la Persona 2 (se puede commitear despues en el PR)
+  InstanciaCfnB:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: t3.nano
+      SecurityGroupIds:
+        - !Ref SecurityGroupId
+      IamInstanceProfile: !Ref IamInstanceProfile
+      Tags:
+        - Key: Name
+          Value: cfn-practica-persona-2
+        - Key: Owner
+          Value: IntegranteB
+
+Outputs:
+  InstanceAId:
+    Description: ID de la maquina del Integrante 1
+    Value: !Ref InstanciaCfnA
+  InstanceBId:
+    Description: ID de la maquina del Integrante 2
+    Value: !Ref InstanciaCfnB
