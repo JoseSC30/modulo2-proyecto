@@ -22,6 +22,8 @@ Desde AWS CloudFormation, crea un stack usando `template.yaml` y proporciona:
 - Región y zona compatibles, por defecto `us-east-2` / `us-east-2a`.
 - `LatestAmiId`, por defecto `ami-0fc53b217ec1ad816`, una AMI Ubuntu 24.04
   válida en `us-east-2`. Debe cambiarse si se despliega en otra región.
+- `VpcCidr`, por defecto `172.31.0.0/16`; debe coincidir con el CIDR de la VPC
+  predeterminada de la cuenta.
 
 Si utilizas Git Sync, reemplaza los valores `REPLACE_WITH_*` de
 `cfn-deplyment.json` antes de sincronizar. Son placeholders intencionales y no
