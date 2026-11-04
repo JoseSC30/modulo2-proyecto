@@ -1,7 +1,9 @@
 {
   "template-file-path": "cloudformation/cloudformation-prueba01/template.yaml",
   "parameters": {
-    "InstanceType": "t3.nano"
+    "InstanceType": "t3.nano",
+    "DatabasePassword": "REPLACE_WITH_A_SECURE_DB_PASSWORD",
+    "JwtSecret": "REPLACE_WITH_A_SECURE_JWT_SECRET_VALUE"
   },
   "tags": {
     "Proyecto": "Practica-CloudFormation",

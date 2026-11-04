@@ -23,6 +23,10 @@ Desde AWS CloudFormation, crea un stack usando `template.yaml` y proporciona:
 - `LatestAmiId`, por defecto `ami-09519cc56eb20524`, una AMI Ubuntu que ya
   funcionó con Terraform. Debe cambiarse si se despliega en otra región.
 
+Si utilizas Git Sync, reemplaza los valores `REPLACE_WITH_*` de
+`cfn-deplyment.json` antes de sincronizar. Son placeholders intencionales y no
+deben llegar a producción.
+
 También puedes usar AWS CLI:
 
 ```powershell
