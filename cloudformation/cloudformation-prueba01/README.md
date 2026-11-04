@@ -20,8 +20,8 @@ Desde AWS CloudFormation, crea un stack usando `template.yaml` y proporciona:
 - `DatabasePassword`: mínimo 16 caracteres.
 - `JwtSecret`: mínimo 32 caracteres.
 - Región y zona compatibles, por defecto `us-east-2` / `us-east-2a`.
-- `LatestAmiId`, por defecto `ami-09519cc56eb20524`, una AMI Ubuntu que ya
-  funcionó con Terraform. Debe cambiarse si se despliega en otra región.
+- `LatestAmiId`, por defecto `ami-0fc53b217ec1ad816`, una AMI Ubuntu 24.04
+  válida en `us-east-2`. Debe cambiarse si se despliega en otra región.
 
 Si utilizas Git Sync, reemplaza los valores `REPLACE_WITH_*` de
 `cfn-deplyment.json` antes de sincronizar. Son placeholders intencionales y no

@@ -4,7 +4,7 @@ Description: Control de Asistencia - backend PostgreSQL y frontend con cloud-ini
 Parameters:
   LatestAmiId:
     Type: AWS::EC2::Image::Id
-    Default: ami-09519cc56eb20524
+    Default: ami-0fc53b217ec1ad816
   InstanceType:
     Type: String
     Default: t2.micro
