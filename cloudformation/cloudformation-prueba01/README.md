@@ -43,5 +43,14 @@ Para eliminar solo los recursos de este stack:
 aws cloudformation delete-stack --stack-name cfn-control-asistencia
 ```
 
+Si el stack ya creó las instancias antes de cambiar `UserData`, elimina el
+stack y créalo nuevamente. Cloud-init se ejecuta durante el primer arranque;
+actualizar el template no garantiza que se vuelva a ejecutar en una instancia
+existente:
+
+```powershell
+aws cloudformation delete-stack --stack-name lab-github-01
+```
+
 Terraform, Pulumi y CloudFormation usan nombres y estados separados. Pueden
 coexistir sin administrar los recursos de los otros proyectos.
