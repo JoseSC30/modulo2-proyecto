@@ -216,12 +216,12 @@ function infrastructureDirectory(tenant, tool) {
   if (tool === "terraform") {
     const configured = cloud === "azure"
       ? process.env.PANEL_TERRAFORM_AZURE_DIR
-      : process.env.PANEL_TERRAFORM_AWS_DIR || process.env.PANEL_TERRAFORM_DIR;
+      : process.env.PANEL_TERRAFORM_AWS_DIR;
     return path.resolve(__dirname, configured || `../terraform/${cloud}`);
   }
   const configured = cloud === "azure"
     ? process.env.PANEL_PULUMI_AZURE_DIR
-    : process.env.PANEL_PULUMI_AWS_DIR || process.env.PANEL_PULUMI_DIR;
+    : process.env.PANEL_PULUMI_AWS_DIR;
   return path.resolve(__dirname, configured || `../pulumi/${cloud}`);
 }
 
@@ -266,15 +266,15 @@ function terraformVariables(tenant, plan, subscriptionId) {
     `database_volume_size=${plan.databaseVolumeSize}`,
     `instance_type=${plan.instanceType}`
   ];
-  const optional = [
+  return [...vars, ...awsAmiVariables()];
+}
+
+function awsAmiVariables(placeholder) {
+  return [
     ["database_ami_id", process.env.PANEL_DATABASE_AMI_ID],
     ["backend_ami_id", process.env.PANEL_BACKEND_AMI_ID],
     ["frontend_ami_id", process.env.PANEL_FRONTEND_AMI_ID]
-  ];
-  optional.forEach(([key, value]) => {
-    if (value) vars.push(`${key}=${value}`);
-  });
-  return vars;
+  ].map(([key, value]) => [key, value || placeholder]).filter(([, value]) => value).map(([key, value]) => `${key}=${value}`);
 }
 
 async function runTerraform(tenant, plan, job, report) {
@@ -483,7 +483,11 @@ async function destroyProvisioning(tenant, job, report) {
   ], { cwd: directory, env }, report);
   await report("Eliminando los recursos administrados por Terraform");
   const destroyArgs = ["destroy", "-auto-approve", "-input=false", "-no-color", `-var=project_name=${tenant.slug}`];
-  if (tenantCloud(tenant) === "azure") {
+  if (tenantCloud(tenant) !== "azure") {
+    // Las variables de AMI no tienen default; destroy las exige aunque no se usen,
+    // por eso se envía un valor de relleno si el panel no las tiene configuradas.
+    awsAmiVariables("ami-unused").forEach((value) => destroyArgs.push("-var", value));
+  } else {
     const subscriptionId = await azureSubscriptionId(report);
     [
       `azure_subscription_id=${subscriptionId}`,
