@@ -1,0 +1,180 @@
+---
+- name: Configurar PostgreSQL y cargar el esquema
+  hosts: role_database
+  become: true
+  gather_facts: true
+
+  vars:
+    backend_private_ip: "{{ hostvars[groups['role_backend'][0]].private_ip_address }}"
+
+  tasks:
+    - name: Crear usuario de aplicacion en el sistema
+      ansible.builtin.user:
+        name: "{{ application_user }}"
+        shell: /bin/bash
+        create_home: true
+
+    - name: Asegurar que PostgreSQL este iniciado
+      ansible.builtin.service:
+        name: postgresql
+        state: started
+        enabled: true
+
+    - name: Instalar herramientas de diagnostico de red
+      ansible.builtin.apt:
+        name: iproute2
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Obtener archivos de configuracion de PostgreSQL
+      ansible.builtin.find:
+        paths: /etc/postgresql
+        patterns:
+          - postgresql.conf
+          - pg_hba.conf
+        recurse: true
+      register: postgresql_config_files
+
+    - name: Definir rutas de configuracion
+      ansible.builtin.set_fact:
+        postgresql_conf: "{{ (postgresql_config_files.files | selectattr('path', 'search', 'postgresql.conf$') | map(attribute='path') | list | first) }}"
+        pg_hba_conf: "{{ (postgresql_config_files.files | selectattr('path', 'search', 'pg_hba.conf$') | map(attribute='path') | list | first) }}"
+
+    - name: Escuchar conexiones PostgreSQL de la VPC
+      ansible.builtin.lineinfile:
+        path: "{{ postgresql_conf }}"
+        regexp: "^\\s*#?\\s*listen_addresses\\s*="
+        line: "listen_addresses = '*'"
+
+    - name: Autorizar al backend en PostgreSQL
+      ansible.builtin.lineinfile:
+        path: "{{ pg_hba_conf }}"
+        regexp: "^host\\s+{{ database_name }}\\s+{{ database_user }}\\s+{{ backend_private_ip | regex_escape }}\\s"
+        line: "host {{ database_name }} {{ database_user }} {{ backend_private_ip }}/32 scram-sha-256"
+        insertafter: EOF
+
+    - name: Reiniciar PostgreSQL con la configuracion de red
+      ansible.builtin.service:
+        name: postgresql
+        state: restarted
+
+    - name: Comprobar estado del cluster PostgreSQL
+      ansible.builtin.command: pg_lsclusters
+      register: postgresql_clusters
+      changed_when: false
+
+    - name: Mostrar estado del cluster PostgreSQL
+      ansible.builtin.debug:
+        var: postgresql_clusters.stdout_lines
+
+    - name: Comprobar sockets PostgreSQL despues del reinicio
+      ansible.builtin.command: ss -ltnp
+      register: postgresql_sockets_before_wait
+      changed_when: false
+
+    - name: Mostrar sockets PostgreSQL despues del reinicio
+      ansible.builtin.debug:
+        var: postgresql_sockets_before_wait.stdout_lines
+
+    - name: Esperar PostgreSQL en la interfaz privada
+      ansible.builtin.wait_for:
+        host: "{{ ansible_facts.default_ipv4.address }}"
+        port: 5432
+        state: started
+        timeout: 120
+
+    - name: Mostrar sockets PostgreSQL activos
+      ansible.builtin.command: ss -ltnp
+      register: postgresql_sockets
+      changed_when: false
+
+    - name: Confirmar que PostgreSQL escucha en 5432
+      ansible.builtin.assert:
+        that:
+          - postgresql_sockets.stdout is search(":5432")
+        fail_msg: >-
+          PostgreSQL no esta escuchando en el puerto 5432. Revisar
+          systemctl status postgresql y listen_addresses.
+
+    - name: Crear usuario de base de datos
+      ansible.builtin.shell: |
+        set -euo pipefail
+        if ! runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='{{ database_user }}'" | grep -q 1; then
+          runuser -u postgres -- psql -v ON_ERROR_STOP=1 -c "CREATE USER {{ database_user }} WITH PASSWORD '{{ database_password }}';"
+        else
+          runuser -u postgres -- psql -v ON_ERROR_STOP=1 -c "ALTER USER {{ database_user }} WITH PASSWORD '{{ database_password }}';"
+        fi
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Crear base de datos de la aplicacion
+      ansible.builtin.shell: |
+        set -euo pipefail
+        if ! runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_database WHERE datname='{{ database_name }}'" | grep -q 1; then
+          runuser -u postgres -- createdb -O "{{ database_user }}" "{{ database_name }}"
+        fi
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Marcar repositorio de esquema como seguro para Git
+      ansible.builtin.command:
+        cmd: git config --system --add safe.directory /opt/backend-source
+      changed_when: false
+
+    - name: Clonar repositorio para obtener schema.sql
+      ansible.builtin.git:
+        repo: "{{ backend_repository }}"
+        version: "{{ repository_branch }}"
+        dest: /opt/backend-source
+        force: false
+
+    - name: Asignar propietario al repositorio de esquema
+      ansible.builtin.file:
+        path: /opt/backend-source
+        owner: "{{ application_user }}"
+        group: "{{ application_user }}"
+        recurse: true
+
+    - name: Cargar schema.sql en PostgreSQL
+      ansible.builtin.shell: |
+        set -euo pipefail
+        sed '/^CREATE DATABASE /d;/^\\connect /d' /opt/backend-source/schema.sql > /tmp/control-asistencia-schema.sql
+        runuser -u postgres -- psql -v ON_ERROR_STOP=1 -d {{ database_name }} -f /tmp/control-asistencia-schema.sql
+        touch /var/lib/control-asistencia-schema.loaded
+      args:
+        executable: /bin/bash
+        creates: /var/lib/control-asistencia-schema.loaded
+      changed_when: true
+
+    - name: Otorgar permisos de aplicacion sobre el esquema
+      ansible.builtin.command:
+        argv:
+          - runuser
+          - -u
+          - postgres
+          - --
+          - psql
+          - -v
+          - ON_ERROR_STOP=1
+          - -d
+          - "{{ database_name }}"
+          - -c
+          - >-
+            GRANT USAGE ON SCHEMA public TO {{ database_user }};
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO {{ database_user }};
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO {{ database_user }};
+            GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO {{ database_user }};
+            ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+            GRANT ALL PRIVILEGES ON TABLES TO {{ database_user }};
+            ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+            GRANT ALL PRIVILEGES ON SEQUENCES TO {{ database_user }};
+      changed_when: true
+
+  handlers:
+    - name: Reiniciar PostgreSQL
+      ansible.builtin.service:
+        name: postgresql
+        state: restarted

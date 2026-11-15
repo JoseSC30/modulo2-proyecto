@@ -1,29 +1,90 @@
-/pulumi/bin/
-/pulumi/node_modules/
-/pulumi/.pulumi/
+# ====================================================================
+# Entornos virtuales y dependencias de Python (Ansible / Scripts)
+# ====================================================================
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+ansible/.cache/
+ansible/.venv/
+*.retry
 
-/terraform/.terraform/
-/terraform/*.tfstate
-/terraform/*.tfstate.*
-/terraform/*.tfvars
-/terraform/*.tfplan
-/terraform/*.tfplan.*
-/terraform/.terraform.tfstate.lock.info
-/terraform/crash.log
-/terraform/crash.*.log
-
-# Secretos y configuracion local
-.env
-.env.*
-!.env.example
-!.env.*.example
-
-# Node.js
+# ====================================================================
+# Node.js & JavaScript (Panel Tenant / Pulumi)
+# ====================================================================
+node_modules/
+**/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+.npm/
 
-# Salidas temporales
+# ====================================================================
+# Secretos, Credenciales y Claves Locales
+# ====================================================================
+.env
+.env.*
+!.env.example
+!.env.*.example
+keys/*
+!keys/*.pub
+!keys/README.md
+*.pem
+*.key
+*.id_rsa
+
+# ====================================================================
+# Panel Tenant (Datos dinámicos y temporales)
+# ====================================================================
+panel_tenant/.env
+panel_tenant/data/jobs/
+panel_tenant/data/store.json
+panel_tenant/data/store.json.tmp
+panel_tenant/data/tenants/
+
+# ====================================================================
+# Terraform & OpenTofu (Caché, Bloqueos y Estados)
+# ====================================================================
+**/.terraform/
+**/.terraform.lock.hcl
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfvars
+**/*.tfvars.json
+!**/*.tfvars.example
+!**/*.tfvars.json.example
+**/*.tfplan
+**/*.tfplan.*
+**/.terraform.tfstate.lock.info
+**/crash.log
+**/crash.*.log
+
+# ====================================================================
+# Pulumi (Binarios, stacks locales y estado)
+# ====================================================================
+pulumi/bin/
+.pulumi/
+**/.pulumi/
+pulumi/**/Pulumi.tenant-*.yaml
+pulumi/**/Pulumi.dev.yaml
+
+# ====================================================================
+# Packer (Variables locales y caché)
+# ====================================================================
+**/*.pkrvars.hcl
+!**/*.pkrvars.hcl.example
+**/.packer.d/
+packer_cache/
+
+# ====================================================================
+# Archivos del sistema y logs generales
+# ====================================================================
 *.log
 coverage/
+.DS_Store
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini

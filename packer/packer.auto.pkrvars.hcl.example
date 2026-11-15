@@ -1,0 +1,7 @@
+aws_region  = "us-east-2"
+subnet_id   = "subnet-REEMPLAZAR"
+instance_type = "t2.micro"
+project_name  = "control-asistencia"
+
+# Dejar vacío para usar el perfil predeterminado de AWS CLI.
+aws_profile = ""

@@ -3,7 +3,8 @@
 Este proyecto crea la misma infraestructura que Terraform, pero con nombres
 y estado propios para poder coexistir con Terraform:
 
-- `pulumi-control-asistencia-2026-backend-db`: backend Node.js + PostgreSQL.
+- `pulumi-control-asistencia-2026-database`: PostgreSQL independiente.
+- `pulumi-control-asistencia-2026-backend`: backend Node.js servido por Nginx.
 - `pulumi-control-asistencia-2026-frontend`: frontend React/Vite servido por Nginx.
 - Security groups separados y etiquetados con `pulumi-control-asistencia-2026`.
 - La VPC predeterminada se consulta, pero no se administra.
@@ -36,6 +37,10 @@ Los valores opcionales se pueden cambiar así:
 pulumi config set projectName pulumi-control-asistencia-2026
 pulumi config set backendRepository https://github.com/JoseSC30/backend-control-asistencia.git
 pulumi config set frontendRepository https://github.com/JoseSC30/frontend-control-asistencia.git
+pulumi config set databaseAmiId ami-038688e44f645d38b
+pulumi config set backendAmiId ami-0d2762890413d06f8
+pulumi config set frontendAmiId ami-06dc23ac77b6391f1
+pulumi config set databaseVolumeSize 10
 ```
 
 Para eliminar únicamente los recursos administrados por Pulumi:

@@ -1,0 +1,106 @@
+---
+- name: Construir y publicar frontend
+  hosts: role_frontend
+  become: true
+  gather_facts: true
+
+  vars:
+    backend_private_ip: "{{ hostvars[groups['role_backend'][0]].private_ip_address }}"
+
+  tasks:
+    - name: Instalar Node.js 20
+      ansible.builtin.shell: |
+        set -euo pipefail
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+        apt-get install -y nodejs
+      args:
+        executable: /bin/bash
+        creates: /usr/bin/node
+
+    - name: Crear usuario de aplicacion
+      ansible.builtin.user:
+        name: "{{ application_user }}"
+        shell: /bin/bash
+        create_home: true
+
+    - name: Marcar repositorio frontend como seguro para Git
+      ansible.builtin.command:
+        cmd: git config --system --add safe.directory /opt/frontend
+      changed_when: false
+
+    - name: Clonar frontend
+      ansible.builtin.git:
+        repo: "{{ frontend_repository }}"
+        version: "{{ repository_branch }}"
+        dest: /opt/frontend
+        force: true
+
+    - name: Asignar propietario al frontend
+      ansible.builtin.file:
+        path: /opt/frontend
+        owner: "{{ application_user }}"
+        group: "{{ application_user }}"
+        recurse: true
+
+    - name: Instalar dependencias del frontend
+      ansible.builtin.command:
+        cmd: npm ci
+        chdir: /opt/frontend
+      become_user: "{{ application_user }}"
+
+    - name: Construir frontend con API relativa
+      ansible.builtin.command:
+        cmd: npm run build
+        chdir: /opt/frontend
+      environment:
+        VITE_API_URL: /api
+      become_user: "{{ application_user }}"
+
+    - name: Crear directorio publico
+      ansible.builtin.file:
+        path: /var/www/control-asistencia
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: "0755"
+
+    - name: Publicar archivos compilados
+      ansible.builtin.copy:
+        remote_src: true
+        src: /opt/frontend/dist/
+        dest: /var/www/control-asistencia/
+        owner: www-data
+        group: www-data
+        mode: preserve
+
+    - name: Configurar Nginx del frontend
+      ansible.builtin.template:
+        src: control-asistencia-frontend.nginx.j2
+        dest: /etc/nginx/sites-available/control-asistencia
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Reiniciar Nginx
+
+    - name: Activar sitio del frontend
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/control-asistencia
+        dest: /etc/nginx/sites-enabled/control-asistencia
+        state: link
+      notify: Reiniciar Nginx
+
+    - name: Desactivar sitio predeterminado
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Reiniciar Nginx
+
+    - name: Validar configuracion completa de Nginx
+      ansible.builtin.command: nginx -t
+      changed_when: false
+
+  handlers:
+    - name: Reiniciar Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: restarted

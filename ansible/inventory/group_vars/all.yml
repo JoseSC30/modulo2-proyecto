@@ -1,0 +1,12 @@
+---
+ansible_user: ubuntu
+ansible_become: true
+
+application_user: app
+backend_repository: https://github.com/JoseSC30/backend-control-asistencia.git
+frontend_repository: https://github.com/JoseSC30/frontend-control-asistencia.git
+repository_branch: main
+database_name: appdb
+database_user: appuser
+database_password: "{{ lookup('ansible.builtin.password', inventory_dir + '/../.cache/database_password', length=32, chars='ascii_letters,digits') }}"
+jwt_secret: "{{ lookup('ansible.builtin.password', inventory_dir + '/../.cache/jwt_secret', length=64, chars='ascii_letters,digits') }}"

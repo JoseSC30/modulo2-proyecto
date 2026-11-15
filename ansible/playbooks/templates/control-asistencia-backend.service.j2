@@ -1,0 +1,16 @@
+[Unit]
+Description=Control de Asistencia Backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ application_user }}
+WorkingDirectory=/opt/backend
+EnvironmentFile=/etc/control-asistencia-backend.env
+ExecStart=/usr/bin/node /opt/backend/src/server.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

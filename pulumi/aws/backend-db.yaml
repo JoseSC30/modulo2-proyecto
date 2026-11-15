@@ -78,3 +78,4 @@ runcmd:
   - [ bash, -c, "rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/control-asistencia-backend; ln -s /etc/nginx/sites-available/control-asistencia-backend /etc/nginx/sites-enabled/control-asistencia-backend; nginx -t" ]
   - [ systemctl, restart, nginx ]
   - [ systemctl, enable, nginx ]
+  - [ bash, -c, "DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y prometheus-node-exporter && systemctl enable --now prometheus-node-exporter" ]

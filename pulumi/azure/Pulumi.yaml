@@ -1,0 +1,10 @@
+name: infraestructura-pulumi-azure
+description: Infraestructura Azure para tenants de control de asistencias
+runtime:
+  name: nodejs
+  options:
+    packagemanager: npm
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: azure-typescript

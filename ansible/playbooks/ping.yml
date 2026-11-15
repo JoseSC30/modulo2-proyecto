@@ -1,0 +1,12 @@
+---
+- name: Verificar conectividad con las instancias creadas por Terraform
+  hosts: role_database:role_backend:role_frontend
+  gather_facts: false
+
+  tasks:
+    - name: Esperar a que SSH este disponible
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+
+    - name: Ejecutar ping de Ansible
+      ansible.builtin.ping:

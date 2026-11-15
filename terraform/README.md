@@ -1,4 +1,4 @@
-# Proyecto Terraform: backend y PostgreSQL
+# Proyecto Terraform: frontend, backend y PostgreSQL
 
 Este directorio es un proyecto independiente del despliegue anterior. Usa
 la clave `terraform/backend-db-app/terraform.tfstate` del backend S3, por lo
@@ -6,16 +6,19 @@ que no lee ni modifica el estado anterior.
 
 ## Recursos
 
-- Una instancia EC2 para el backend con PostgreSQL.
-- Una instancia EC2 para el frontend.
+- Una instancia EC2 independiente para PostgreSQL.
+- Una instancia EC2 independiente para el backend.
+- Una instancia EC2 independiente para el frontend.
+- El volumen de la base de datos se puede configurar con 10 GB o 20 GB.
 - No se configura key pair: el acceso administrativo se realizará mediante
   EC2 Instance Connect en la consola de AWS. El puerto SSH queda abierto para
   permitir esa conexión; conviene restringirlo posteriormente al rango
   publicado por AWS para EC2 Instance Connect.
 - La VPC predeterminada se consulta, pero no se administra.
-- `cloud-init` instala Node.js, PostgreSQL y Nginx, crea los servicios
-  systemd, carga `schema.sql`, crea el usuario de aplicación y clona los
-  repositorios indicados en las variables.
+- Las AMIs se crean con Packer y se indican mediante
+  `database_ami_id`, `backend_ami_id` y `frontend_ami_id`.
+- `cloud-init` configura la red privada, crea los servicios systemd, carga
+  `schema.sql`, crea el usuario de aplicación y clona los repositorios.
 
 El backend escucha en el puerto 3000 dentro de la VPC. El frontend se
 construye con Vite usando `/api` y Nginx hace proxy interno hacia el backend;
@@ -30,10 +33,18 @@ los usuarios solo necesitan acceder al frontend por el puerto 80.
    aws sts get-caller-identity
    ```
 
-2. Copia `terraform.tfvars.example` como `terraform.tfvars` y reemplaza las
-   URLs de GitHub y los valores del proyecto.
+2. Construye las tres AMIs desde `packer/` y copia sus IDs en una copia de
+   `terraform.tfvars.example`.
+3. Selecciona el tamaño de la base de datos:
 
-3. Inicializa este estado independiente:
+   ```hcl
+   database_volume_size = 10 # o 20
+   ```
+
+4. Copia el archivo como `terraform.tfvars` y reemplaza los valores del
+   proyecto.
+
+5. Inicializa este estado independiente:
 
    ```powershell
    terraform init -reconfigure

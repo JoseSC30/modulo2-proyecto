@@ -22,14 +22,34 @@ variable "instance_type" {
   default     = "t2.micro"
 }
 
-variable "ami_id" {
-  description = "ID fijo de la AMI de Ubuntu utilizada por las instancias."
+variable "database_ami_id" {
+  description = "AMI Ubuntu preparada para PostgreSQL."
   type        = string
-  default     = "ami-09519cc56eb20524a"
 }
 
-variable "backend_db_repository" {
-  description = "URL HTTPS del repositorio GitHub para el backend con PostgreSQL."
+variable "backend_ami_id" {
+  description = "AMI Ubuntu preparada para el backend."
+  type        = string
+}
+
+variable "frontend_ami_id" {
+  description = "AMI Ubuntu preparada para el frontend."
+  type        = string
+}
+
+variable "database_volume_size" {
+  description = "Tamaño del volumen raíz de la instancia de base de datos en GB."
+  type        = number
+  default     = 10
+
+  validation {
+    condition     = var.database_volume_size >= 10
+    error_message = "database_volume_size debe ser como mínimo 10 GB."
+  }
+}
+
+variable "backend_repository" {
+  description = "URL HTTPS del repositorio GitHub para el backend."
   type        = string
   default     = "https://github.com/JoseSC30/backend-control-asistencia.git"
 }
@@ -41,7 +61,7 @@ variable "frontend_repository" {
 }
 
 variable "repository_branch" {
-  description = "Rama que se clonará en ambas instancias."
+  description = "Rama que se clonará en las instancias de aplicación y base de datos."
   type        = string
   default     = "main"
 }

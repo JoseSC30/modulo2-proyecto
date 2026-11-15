@@ -1,0 +1,7 @@
+---
+database_packages:
+  - git
+  - postgresql
+  - postgresql-contrib
+  - curl
+  - python3-psycopg2

@@ -1,0 +1,6 @@
+azure_subscription_id       = "00000000-0000-0000-0000-000000000000"
+azure_tenant_id              = ""
+azure_location               = "eastus2"
+azure_image_resource_group   = "rg-control-asistencia-images"
+azure_vm_size                = "Standard_D2ads_v7"
+project_name                = "control-asistencia"

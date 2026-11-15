@@ -1,0 +1,170 @@
+---
+- name: Desplegar backend Node.js
+  hosts: role_backend
+  become: true
+  gather_facts: true
+
+  vars:
+    database_private_ip: "{{ hostvars[groups['role_database'][0]].private_ip_address }}"
+
+  tasks:
+    - name: Instalar cliente PostgreSQL para validar la base de datos
+      ansible.builtin.apt:
+        name: postgresql-client
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Instalar Node.js 20
+      ansible.builtin.shell: |
+        set -euo pipefail
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+        apt-get install -y nodejs
+      args:
+        executable: /bin/bash
+        creates: /usr/bin/node
+
+    - name: Crear usuario de aplicacion
+      ansible.builtin.user:
+        name: "{{ application_user }}"
+        shell: /bin/bash
+        create_home: true
+
+    - name: Marcar repositorio backend como seguro para Git
+      ansible.builtin.command:
+        cmd: git config --system --add safe.directory /opt/backend
+      changed_when: false
+
+    - name: Clonar backend
+      ansible.builtin.git:
+        repo: "{{ backend_repository }}"
+        version: "{{ repository_branch }}"
+        dest: /opt/backend
+        force: true
+
+    - name: Asignar propietario al backend
+      ansible.builtin.file:
+        path: /opt/backend
+        owner: "{{ application_user }}"
+        group: "{{ application_user }}"
+        recurse: true
+
+    - name: Instalar dependencias del backend
+      ansible.builtin.command:
+        cmd: npm ci --omit=dev
+        chdir: /opt/backend
+      become_user: "{{ application_user }}"
+
+    - name: Crear variables de entorno del backend
+      ansible.builtin.template:
+        src: backend.env.j2
+        dest: /etc/control-asistencia-backend.env
+        owner: root
+        group: root
+        mode: "0600"
+      notify: Reiniciar backend
+
+    - name: Esperar a que PostgreSQL acepte conexiones
+      ansible.builtin.wait_for:
+        host: "{{ database_private_ip }}"
+        port: 5432
+        state: started
+        timeout: 120
+
+    - name: Comprobar conexion del backend con PostgreSQL
+      ansible.builtin.shell: |
+        set -euo pipefail
+        psql \
+          --host='{{ database_private_ip }}' \
+          --port=5432 \
+          --username='{{ database_user }}' \
+          --dbname='{{ database_name }}' \
+          --command='SELECT 1'
+      args:
+        executable: /bin/bash
+      environment:
+        PGPASSWORD: "{{ database_password }}"
+        PGCONNECT_TIMEOUT: "10"
+      changed_when: false
+
+    - name: Comprobar tablas requeridas para login
+      ansible.builtin.shell: |
+        set -euo pipefail
+        psql \
+          --host='{{ database_private_ip }}' \
+          --port=5432 \
+          --username='{{ database_user }}' \
+          --dbname='{{ database_name }}' \
+          --tuples-only \
+          --command="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('app_users', 'students', 'modules')"
+      args:
+        executable: /bin/bash
+      environment:
+        PGPASSWORD: "{{ database_password }}"
+        PGCONNECT_TIMEOUT: "10"
+      register: required_tables
+      changed_when: false
+      failed_when: required_tables.stdout | trim | int != 3
+
+    - name: Instalar servicio systemd del backend
+      ansible.builtin.template:
+        src: control-asistencia-backend.service.j2
+        dest: /etc/systemd/system/control-asistencia-backend.service
+        owner: root
+        group: root
+        mode: "0644"
+      notify:
+        - Recargar systemd
+        - Reiniciar backend
+
+    - name: Habilitar backend
+      ansible.builtin.systemd:
+        name: control-asistencia-backend
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Configurar Nginx como proxy y health endpoint
+      ansible.builtin.template:
+        src: control-asistencia-backend.nginx.j2
+        dest: /etc/nginx/sites-available/control-asistencia-backend
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Reiniciar Nginx
+
+    - name: Activar sitio del backend
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/control-asistencia-backend
+        dest: /etc/nginx/sites-enabled/control-asistencia-backend
+        state: link
+      notify: Reiniciar Nginx
+
+    - name: Desactivar sitio predeterminado del backend
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Reiniciar Nginx
+
+    - name: Validar servicio backend
+      ansible.builtin.command: systemctl is-active control-asistencia-backend
+      changed_when: false
+
+    - name: Validar configuracion completa de Nginx
+      ansible.builtin.command: nginx -t
+      changed_when: false
+
+  handlers:
+    - name: Recargar systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Reiniciar backend
+      ansible.builtin.systemd:
+        name: control-asistencia-backend
+        state: restarted
+
+    - name: Reiniciar Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: restarted

@@ -1,0 +1,6 @@
+---
+backend_packages:
+  - git
+  - curl
+  - nginx
+  - postgresql-client

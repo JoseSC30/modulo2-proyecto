@@ -1,0 +1,5 @@
+---
+frontend_packages:
+  - git
+  - curl
+  - nginx

@@ -1,0 +1,50 @@
+#cloud-config
+package_update: true
+packages:
+  - git
+  - nginx
+  - curl
+
+write_files:
+  - path: /etc/nginx/sites-available/control-asistencia
+    owner: root:root
+    permissions: "0644"
+    content: |
+      server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name _;
+        root /var/www/control-asistencia;
+        index index.html;
+
+        location / {
+          try_files $uri $uri/ /index.html;
+        }
+
+        location /api/ {
+          proxy_pass http://${backend_private_ip}:3000/api/;
+          proxy_http_version 1.1;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+
+        location = /api {
+          proxy_pass http://${backend_private_ip}:3000/api;
+          proxy_http_version 1.1;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+      }
+
+runcmd:
+  - [ bash, -c, "id -u ${application_user} >/dev/null 2>&1 || useradd --create-home --shell /bin/bash ${application_user}" ]
+  - [ bash, -c, "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -" ]
+  - [ apt-get, install, -y, nodejs ]
+  - [ bash, -c, "git clone --branch ${repository_branch} ${repository_url} /opt/frontend" ]
+  - [ bash, -c, "chown -R ${application_user}:${application_user} /opt/frontend; cd /opt/frontend; npm ci; VITE_API_URL=/api npm run build" ]
+  - [ bash, -c, "rm -rf /var/www/control-asistencia; install -d -o www-data -g www-data /var/www/control-asistencia; cp -a /opt/frontend/dist/. /var/www/control-asistencia/; chown -R www-data:www-data /var/www/control-asistencia" ]
+  - [ bash, -c, "rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/control-asistencia; ln -s /etc/nginx/sites-available/control-asistencia /etc/nginx/sites-enabled/control-asistencia; nginx -t" ]
+  - [ systemctl, restart, nginx ]
+  - [ systemctl, enable, nginx ]

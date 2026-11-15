@@ -1,0 +1,16 @@
+---
+plugin: amazon.aws.aws_ec2
+regions:
+  - us-east-2
+filters:
+  tag:Project: control-asistencia-ansible
+  instance-state-name: running
+hostnames:
+  - ip-address
+compose:
+  ansible_host: public_ip_address
+keyed_groups:
+  - key: ec2_tags.Project
+    prefix: project
+  - key: ec2_tags.Role
+    prefix: role

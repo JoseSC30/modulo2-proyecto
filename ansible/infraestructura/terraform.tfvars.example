@@ -1,0 +1,10 @@
+# Terraform registra la clave publica; no agregues credenciales ni estado.
+project_name      = "control-asistencia-ansible"
+aws_region        = "us-east-2"
+availability_zone = "us-east-2a"
+instance_type     = "t2.micro"
+ami_id            = "ami-09519cc56eb20524a"
+key_name          = "aws_ec2_key"
+
+# Reemplazar por "x.x.x.x/32" para restringir el acceso SSH.
+ssh_cidr_blocks = ["0.0.0.0/0"]

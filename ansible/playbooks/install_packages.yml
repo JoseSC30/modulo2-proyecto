@@ -1,0 +1,12 @@
+---
+- name: Instalar paquetes base en los tres roles
+  hosts: role_database:role_backend:role_frontend
+  become: true
+
+  tasks:
+    - name: Actualizar indice e instalar paquetes comunes
+      ansible.builtin.apt:
+        name: "{{ (database_packages | default([])) + (backend_packages | default([])) + (frontend_packages | default([])) }}"
+        state: present
+        update_cache: true
+        cache_valid_time: 3600

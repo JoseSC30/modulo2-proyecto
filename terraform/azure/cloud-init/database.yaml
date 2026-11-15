@@ -1,0 +1,22 @@
+#cloud-config
+package_update: true
+
+write_files:
+  - path: /etc/postgresql/control-asistencia.env
+    owner: root:root
+    permissions: "0600"
+    content: |
+      DATABASE_NAME=${database_name}
+      DATABASE_USER=${database_user}
+      DATABASE_PASSWORD=${database_password}
+
+runcmd:
+  - [ bash, -c, "for attempt in $(seq 1 30); do [ -b ${database_data_disk} ] && break; sleep 2; done; if [ -b ${database_data_disk} ]; then mkfs.ext4 -F ${database_data_disk}; mkdir -p /var/lib/postgresql; mount ${database_data_disk} /var/lib/postgresql; echo '${database_data_disk} /var/lib/postgresql ext4 defaults,nofail 0 2' >> /etc/fstab; fi" ]
+  - [ bash, -c, "id -u ${application_user} >/dev/null 2>&1 || useradd --create-home --shell /bin/bash ${application_user}" ]
+  - [ systemctl, enable, --now, postgresql ]
+  - [ bash, -c, "PG_CONF=$(find /etc/postgresql -name postgresql.conf -print -quit); PG_HBA=$(find /etc/postgresql -name pg_hba.conf -print -quit); sed -i \"s/^#listen_addresses = 'localhost'/listen_addresses = '*'/\" \"$PG_CONF\"; printf '\\nhost ${database_name} ${database_user} ${vpc_cidr} scram-sha-256\\n' >> \"$PG_HBA\"; systemctl restart postgresql" ]
+  - [ bash, -c, "if ! sudo -u postgres psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='${database_user}'\" | grep -q 1; then sudo -u postgres psql -v ON_ERROR_STOP=1 -c \"CREATE USER ${database_user} WITH PASSWORD '${database_password}';\"; else sudo -u postgres psql -v ON_ERROR_STOP=1 -c \"ALTER USER ${database_user} WITH PASSWORD '${database_password}';\"; fi" ]
+  - [ bash, -c, "if ! sudo -u postgres psql -tAc \"SELECT 1 FROM pg_database WHERE datname='${database_name}'\" | grep -q 1; then sudo -u postgres psql -v ON_ERROR_STOP=1 -c \"CREATE DATABASE ${database_name} OWNER ${database_user};\"; fi" ]
+  - [ bash, -c, "git clone --branch ${repository_branch} ${backend_repository} /opt/backend-source" ]
+  - [ bash, -c, "chown -R ${application_user}:${application_user} /opt/backend-source; sed '/^CREATE DATABASE /d;/^\\\\connect /d' /opt/backend-source/schema.sql > /tmp/control-asistencia-schema.sql; sudo -u postgres psql -v ON_ERROR_STOP=1 -d ${database_name} -f /tmp/control-asistencia-schema.sql" ]
+  - [ bash, -c, "sudo -u postgres psql -v ON_ERROR_STOP=1 -d ${database_name} -c \"GRANT USAGE ON SCHEMA public TO ${database_user}; GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${database_user}; GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ${database_user}; GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO ${database_user}; ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO ${database_user}; ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO ${database_user};\"" ]
