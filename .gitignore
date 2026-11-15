@@ -10,6 +10,7 @@ __pycache__/
 ansible/.cache/
 ansible/.venv/
 *.retry
+/keys/*
 
 # ====================================================================
 # Node.js & JavaScript (Panel Tenant / Pulumi)
