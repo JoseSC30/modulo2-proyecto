@@ -39,6 +39,7 @@ write_files:
       }
 
 runcmd:
+  - [ bash, -c, "for i in 1 2 3 4 5; do DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 update && DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y prometheus-node-exporter && break; sleep 15; done; systemctl enable --now prometheus-node-exporter" ]
   - [ bash, -c, "id -u ${application_user} >/dev/null 2>&1 || useradd --create-home --shell /bin/bash ${application_user}" ]
   - [ bash, -c, "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -" ]
   - [ apt-get, install, -y, nodejs ]
@@ -48,4 +49,3 @@ runcmd:
   - [ bash, -c, "rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/control-asistencia; ln -s /etc/nginx/sites-available/control-asistencia /etc/nginx/sites-enabled/control-asistencia; nginx -t" ]
   - [ systemctl, restart, nginx ]
   - [ systemctl, enable, nginx ]
-  - [ bash, -c, "DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y prometheus-node-exporter && systemctl enable --now prometheus-node-exporter" ]

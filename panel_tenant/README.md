@@ -72,8 +72,8 @@ ejecutables en Windows, incluso cuando VS Code todavía no ha actualizado su
 
 ## Planes incluidos
 
-- **Básico:** 10 GB, `t2.micro`, hasta 100 estudiantes y respaldo semanal.
-- **Estándar:** 20 GB, `t2.small`, hasta 1,000 estudiantes y respaldo diario.
+- **Básico:** 10 GB de disco para la base de datos y `t2.micro` (1 GB de RAM).
+- **Estándar:** 20 GB de disco para la base de datos y `t2.small` (2 GB de RAM).
 - **Avanzado:** 50 GB, `t3.medium`, hasta 5,000 estudiantes y retención de
   respaldo por 30 días.
 

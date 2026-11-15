@@ -11,6 +11,7 @@ write_files:
       DATABASE_PASSWORD=${database_password}
 
 runcmd:
+  - [ bash, -c, "for i in 1 2 3 4 5; do DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 update && DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y prometheus-node-exporter && break; sleep 15; done; systemctl enable --now prometheus-node-exporter" ]
   - [ bash, -c, "id -u ${application_user} >/dev/null 2>&1 || useradd --create-home --shell /bin/bash ${application_user}" ]
   - [ systemctl, enable, --now, postgresql ]
   - [ bash, -c, "PG_CONF=$(find /etc/postgresql -name postgresql.conf -print -quit); PG_HBA=$(find /etc/postgresql -name pg_hba.conf -print -quit); sed -i \"s/^#listen_addresses = 'localhost'/listen_addresses = '*'/\" \"$PG_CONF\"; printf '\\nhost ${database_name} ${database_user} ${vpc_cidr} scram-sha-256\\n' >> \"$PG_HBA\"; systemctl restart postgresql" ]
@@ -19,4 +20,3 @@ runcmd:
   - [ bash, -c, "git clone --branch ${repository_branch} ${backend_repository} /opt/backend-source" ]
   - [ bash, -c, "chown -R ${application_user}:${application_user} /opt/backend-source; sed '/^CREATE DATABASE /d;/^\\\\connect /d' /opt/backend-source/schema.sql > /tmp/control-asistencia-schema.sql; sudo -u postgres psql -v ON_ERROR_STOP=1 -d ${database_name} -f /tmp/control-asistencia-schema.sql" ]
   - [ bash, -c, "sudo -u postgres psql -v ON_ERROR_STOP=1 -d ${database_name} -c \"GRANT USAGE ON SCHEMA public TO ${database_user}; GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${database_user}; GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ${database_user}; GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO ${database_user}; ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO ${database_user}; ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO ${database_user};\"" ]
-  - [ bash, -c, "DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y prometheus-node-exporter && systemctl enable --now prometheus-node-exporter" ]

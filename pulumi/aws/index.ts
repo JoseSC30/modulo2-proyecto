@@ -25,30 +25,6 @@ const region = awsConfig.get("region") ?? "us-east-2";
 
 const defaultVpc = aws.ec2.getVpcOutput({ default: true });
 
-const databaseSg = new aws.ec2.SecurityGroup(`${projectName}-database-sg`, {
-    name: `${projectName}-database-sg`,
-    description: "PostgreSQL privado para el backend",
-    vpcId: defaultVpc.id,
-    ingress: [
-        { description: "SSH mediante EC2 Instance Connect", fromPort: 22, toPort: 22, protocol: "tcp", cidrBlocks: ["0.0.0.0/0"] },
-        { description: "Node Exporter para Prometheus", fromPort: 9100, toPort: 9100, protocol: "tcp", cidrBlocks: ["0.0.0.0/0"] },
-    ],
-    egress: [{ fromPort: 0, toPort: 0, protocol: "-1", cidrBlocks: ["0.0.0.0/0"] }],
-    tags: { Name: `${projectName}-database-sg`, Project: projectName },
-});
-
-const backendSg = new aws.ec2.SecurityGroup(`${projectName}-backend-sg`, {
-    name: `${projectName}-backend-sg`,
-    description: "HTTP y API del backend",
-    vpcId: defaultVpc.id,
-    ingress: [
-        { description: "SSH mediante EC2 Instance Connect", fromPort: 22, toPort: 22, protocol: "tcp", cidrBlocks: ["0.0.0.0/0"] },
-        { description: "Node Exporter para Prometheus", fromPort: 9100, toPort: 9100, protocol: "tcp", cidrBlocks: ["0.0.0.0/0"] },
-    ],
-    egress: [{ fromPort: 0, toPort: 0, protocol: "-1", cidrBlocks: ["0.0.0.0/0"] }],
-    tags: { Name: `${projectName}-backend-sg`, Project: projectName },
-});
-
 const frontendSg = new aws.ec2.SecurityGroup(`${projectName}-frontend-sg`, {
     name: `${projectName}-frontend-sg`,
     description: "Acceso HTTP para el frontend",
@@ -62,34 +38,31 @@ const frontendSg = new aws.ec2.SecurityGroup(`${projectName}-frontend-sg`, {
     tags: { Name: `${projectName}-frontend-sg`, Project: projectName },
 });
 
-const backendHttp = new aws.ec2.SecurityGroupRule(`${projectName}-backend-http`, {
-    type: "ingress",
-    securityGroupId: backendSg.id,
-    fromPort: 80,
-    toPort: 80,
-    protocol: "tcp",
-    cidrBlocks: ["0.0.0.0/0"],
-    description: "Health endpoint del backend",
+const backendSg = new aws.ec2.SecurityGroup(`${projectName}-backend-sg`, {
+    name: `${projectName}-backend-sg`,
+    description: "HTTP y API del backend",
+    vpcId: defaultVpc.id,
+    ingress: [
+        { description: "SSH mediante EC2 Instance Connect", fromPort: 22, toPort: 22, protocol: "tcp", cidrBlocks: ["0.0.0.0/0"] },
+        { description: "Health endpoint del backend", fromPort: 80, toPort: 80, protocol: "tcp", cidrBlocks: ["0.0.0.0/0"] },
+        { description: "API desde el frontend", fromPort: 3000, toPort: 3000, protocol: "tcp", securityGroups: [frontendSg.id] },
+        { description: "Node Exporter para Prometheus", fromPort: 9100, toPort: 9100, protocol: "tcp", cidrBlocks: ["0.0.0.0/0"] },
+    ],
+    egress: [{ fromPort: 0, toPort: 0, protocol: "-1", cidrBlocks: ["0.0.0.0/0"] }],
+    tags: { Name: `${projectName}-backend-sg`, Project: projectName },
 });
 
-const backendApi = new aws.ec2.SecurityGroupRule(`${projectName}-backend-api`, {
-    type: "ingress",
-    securityGroupId: backendSg.id,
-    fromPort: 3000,
-    toPort: 3000,
-    protocol: "tcp",
-    sourceSecurityGroupId: frontendSg.id,
-    description: "API desde el frontend",
-});
-
-const postgresIngress = new aws.ec2.SecurityGroupRule(`${projectName}-postgres`, {
-    type: "ingress",
-    securityGroupId: databaseSg.id,
-    fromPort: 5432,
-    toPort: 5432,
-    protocol: "tcp",
-    sourceSecurityGroupId: backendSg.id,
-    description: "PostgreSQL desde el backend",
+const databaseSg = new aws.ec2.SecurityGroup(`${projectName}-database-sg`, {
+    name: `${projectName}-database-sg`,
+    description: "PostgreSQL privado para el backend",
+    vpcId: defaultVpc.id,
+    ingress: [
+        { description: "SSH mediante EC2 Instance Connect", fromPort: 22, toPort: 22, protocol: "tcp", cidrBlocks: ["0.0.0.0/0"] },
+        { description: "PostgreSQL desde el backend", fromPort: 5432, toPort: 5432, protocol: "tcp", securityGroups: [backendSg.id] },
+        { description: "Node Exporter para Prometheus", fromPort: 9100, toPort: 9100, protocol: "tcp", cidrBlocks: ["0.0.0.0/0"] },
+    ],
+    egress: [{ fromPort: 0, toPort: 0, protocol: "-1", cidrBlocks: ["0.0.0.0/0"] }],
+    tags: { Name: `${projectName}-database-sg`, Project: projectName },
 });
 
 const databasePassword = new random.RandomPassword(`${projectName}-database-password`, {
@@ -140,7 +113,7 @@ const database = new aws.ec2.Instance(`${projectName}-database`, {
         deleteOnTermination: true,
     },
     tags: { Name: `${projectName}-database`, Project: projectName, Role: "database" },
-}, { dependsOn: [postgresIngress] });
+});
 
 const backendUserData = renderCloudInit("backend.yaml", {
     application_user: applicationUser,
@@ -161,7 +134,7 @@ const backend = new aws.ec2.Instance(`${projectName}-backend`, {
     userData: backendUserData,
     userDataReplaceOnChange: true,
     tags: { Name: `${projectName}-backend`, Project: projectName, Role: "backend" },
-}, { dependsOn: [backendHttp, backendApi] });
+});
 
 const frontendUserData = renderCloudInit("frontend.yaml", {
     application_user: applicationUser,

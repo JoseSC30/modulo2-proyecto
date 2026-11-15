@@ -19,7 +19,7 @@ const DEFAULT_PLANS = [
     retentionDays: 7,
     support: "Comunidad",
     accent: "mint",
-    features: ["10 GB de base de datos", "Hasta 100 estudiantes", "Respaldo semanal", "Monitoreo básico"]
+    features: ["10 GB de disco para la base de datos", "Instancias t2.micro (1 GB de RAM)", "Monitoreo básico"]
   },
   {
     id: "estandar",
@@ -35,7 +35,7 @@ const DEFAULT_PLANS = [
     retentionDays: 14,
     support: "Prioritario",
     accent: "violet",
-    features: ["20 GB de base de datos", "Hasta 1,000 estudiantes", "Respaldo diario", "Métricas ampliadas"]
+    features: ["20 GB de disco para la base de datos", "Instancias t2.small (2 GB de RAM)", "Métricas ampliadas"]
   },
   {
     id: "avanzado",

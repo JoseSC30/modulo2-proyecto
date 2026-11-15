@@ -61,6 +61,7 @@ write_files:
       }
 
 runcmd:
+  - [ bash, -c, "for i in 1 2 3 4 5; do DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 update && DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y prometheus-node-exporter && break; sleep 15; done; systemctl enable --now prometheus-node-exporter" ]
   - [ bash, -c, "id -u ${application_user} >/dev/null 2>&1 || useradd --create-home --shell /bin/bash ${application_user}" ]
   - [ bash, -c, "until pg_isready --host=${database_private_ip} --port=5432 --dbname=${database_name} --username=${database_user}; do sleep 5; done" ]
   - [ bash, -c, "git clone --branch ${repository_branch} ${backend_repository} /opt/backend" ]
@@ -69,4 +70,3 @@ runcmd:
   - [ systemctl, enable, --now, control-asistencia-backend ]
   - [ bash, -c, "rm -f /etc/nginx/sites-enabled/default; ln -sf /etc/nginx/sites-available/control-asistencia-backend /etc/nginx/sites-enabled/control-asistencia-backend; nginx -t" ]
   - [ systemctl, enable, --now, nginx ]
-  - [ bash, -c, "DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y prometheus-node-exporter && systemctl enable --now prometheus-node-exporter" ]
